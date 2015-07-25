@@ -1,0 +1,25 @@
+---
+url: https://github.com/open-source-parsers/jsoncpp.git
+name: libjsoncpp
+branches: 
+    - master
+    - develop
+recipes: 
+    - tag: ^0\.7\.*
+      libraries: 
+        - build/usr/local/lib/libjsoncpp.so
+      script: |
+        mkdir build
+        cd build
+        cmake -DJSONCPP_LIB_BUILD_SHARED=ON -DCMAKE_BUILD_TYPE=Debug ..
+        make
+        make install DESTDIR=.
+    - tag: ^[0-1]\.*
+      libraries: 
+        - build/usr/local/lib/libjsoncpp.so
+      script: |
+        mkdir build
+        cd build
+        cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Debug ..
+        make
+        make install DESTDIR=.

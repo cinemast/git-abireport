@@ -15,6 +15,7 @@ from subprocess import call
 from dulwich.repo import Repo
 from dulwich.porcelain import tag_list
 from shutil import copytree, ignore_patterns, rmtree
+from distutils.version import LooseVersion
 
 
 def checkoutTag(tag):
@@ -52,6 +53,9 @@ def getMatchingTags(spec):
             if (re.match(recipe["tag"], tag)):
                 result.append(tag)
 
+    result=list(set(result))
+    result.sort(key=LooseVersion)
+
     return result
 
 def getRecipeForTag(spec, tag):
@@ -76,6 +80,18 @@ def createOrUpdateRepo(spec):
         os.makedirs("repo")
         call(["git", "clone", spec["url"], "repo"])
 
+def createABIReport(spec, tags):
+    
+    refs = list(tags)
+    refs.extend(spec["branches"])
+
+    for index in range(0,len(refs)-1):
+        tag1 = refs[index]
+        tag2 = refs[index+1]
+        print (refs[index] + " -> " + refs[index+1])
+
+        call(["abi-compliance-checker", "-l", spec["name"], "-old", "builds/"+tag1+"/ABI.dump", "-new", "builds/"+tag2+"/ABI.dump", "-xml"])
+        call(["abi-compliance-checker", "-l", spec["name"], "-old", "builds/"+tag1+"/ABI.dump", "-new", "builds/"+tag2+"/ABI.dump"])
 
 def main():
     if (len(sys.argv) < 2):
@@ -86,17 +102,19 @@ def main():
         spec = yaml.load(stream)
         createOrUpdateRepo(spec)
         tags = getMatchingTags(spec)
+
         for tag in tags:
             if (not os.path.exists("builds/"+tag)):
                 checkoutTag(tag)
                 buildTag(getRecipeForTag(spec, tag), tag)
                 abiDump(getSOfileForTag(spec, tag), tag)
-       
-        for branch in spec["branches"]:
-            #checkoutTag(branch)
-            #buildTag(spec["recipes"][0]["script"], branch)
-            abiDump(spec["recipes"][0]["libraries"], branch)
 
+        for branch in spec["branches"]:
+            checkoutTag(branch)
+            buildTag(spec["recipes"][len(spec["recipes"])-1]["script"], branch)
+            abiDump(spec["recipes"][len(spec["recipes"])-1]["libraries"], branch)
+
+        createABIReport(spec, tags)
 
 if __name__ == "__main__":
     main()
