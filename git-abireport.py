@@ -1,5 +1,12 @@
 #!/usr/bin/python3
 
+__author__ = "Peter Spiess-Knafl"
+__copyright__ = "Copyright 2015"
+__license__ = "GPLv3"
+__version__ = "0.1"
+__email__ = "dev@spiessknafl.at"
+__status__ = "Development"
+
 import sys
 import os
 import yaml
@@ -7,16 +14,32 @@ import re
 from subprocess import call
 from dulwich.repo import Repo
 from dulwich.porcelain import tag_list
+from shutil import copytree, ignore_patterns, rmtree
 
 
 def checkoutTag(tag):
     print("Checking out tag: " + tag)
+    if (os.path.exists("builds/"+tag)):
+        rmtree("builds/"+tag)
+    devnull = open(os.devnull, 'w')
+    call(["git", "-C", "repo", "checkout", tag], stdout=devnull, stderr=devnull)
 
-def buildTag(tag):
+    copytree("repo/", "builds/"+tag, ignore=ignore_patterns('*.git', '.gitignore'))
+    
+    call(["git", "-C", "repo", "checkout", "master"], stdout=devnull, stderr=devnull)
+
+def buildTag(recipe, tag):
     print("Building tag: " + tag)
+    call(recipe, shell=True, cwd="builds/"+tag)
 
-def abiDump(sofile):
-    print("Creating abi-dump for: " + sofile)
+def abiDump(sofiles, tag):
+    print("Creating abi-dump for: " + str(sofiles))
+    command = ["abi-dumper", "-lver", tag]
+    for sofile in sofiles:
+        command.append(os.path.realpath("builds/"+tag+"/"+sofile))
+
+    print(str(command))
+    call(command, cwd="builds/"+tag)
 
 def getMatchingTags(spec):
     repo = Repo("repo")
@@ -26,11 +49,23 @@ def getMatchingTags(spec):
     for tag in tags:
         tag = tag.decode('utf-8')
         for recipe in spec["recipes"]:
-            print(recipe["tag"])
-        print(tag)
-
+            if (re.match(recipe["tag"], tag)):
+                result.append(tag)
 
     return result
+
+def getRecipeForTag(spec, tag):
+    for recipe in spec["recipes"]:
+        if (re.match(recipe["tag"], tag)):
+            return recipe["script"]
+    return ""
+
+def getSOfileForTag(spec, tag):
+    for recipe in spec["recipes"]:
+        if (re.match(recipe["tag"], tag)):
+            return recipe["libraries"]
+    return []
+
 
 def createOrUpdateRepo(spec):
     if (os.path.exists("repo")):
@@ -50,10 +85,17 @@ def main():
     with open(sys.argv[1], 'r') as stream:
         spec = yaml.load(stream)
         createOrUpdateRepo(spec)
-        print(getMatchingTags(spec))
-
-
-
+        tags = getMatchingTags(spec)
+        for tag in tags:
+            if (not os.path.exists("builds/"+tag)):
+                checkoutTag(tag)
+                buildTag(getRecipeForTag(spec, tag), tag)
+                abiDump(getSOfileForTag(spec, tag), tag)
+       
+        for branch in spec["branches"]:
+            #checkoutTag(branch)
+            #buildTag(spec["recipes"][0]["script"], branch)
+            abiDump(spec["recipes"][0]["libraries"], branch)
 
 
 if __name__ == "__main__":
