@@ -36,3 +36,4 @@ builds/
 compat_reports/
 sources/
 
+/compat.log
