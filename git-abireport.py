@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-
 __author__ = "Peter Spiess-Knafl"
 __copyright__ = "Copyright 2015"
 __license__ = "GPLv3"
@@ -8,113 +7,45 @@ __email__ = "dev@spiessknafl.at"
 __status__ = "Development"
 
 import sys
-import os
-import yaml
-import re
+from os import path
 from subprocess import call
-from dulwich.repo import Repo
-from dulwich.porcelain import tag_list
-from shutil import copytree, ignore_patterns, rmtree
-from distutils.version import LooseVersion
+from builder import Builder
+from upstreamspecification import UpstreamSpecification
+from gitupstreamsource import GitUpstremSource
 
-
-def checkoutTag(tag):
-    print("Checking out tag: " + tag)
-    if (os.path.exists("builds/"+tag)):
-        rmtree("builds/"+tag)
-    devnull = open(os.devnull, 'w')
-    call(["git", "-C", "repo", "checkout", tag], stdout=devnull, stderr=devnull)
-
-    copytree("repo/", "builds/"+tag, ignore=ignore_patterns('*.git', '.gitignore'))
+def createSummary(spec, tags):
+    return False
     
-    call(["git", "-C", "repo", "checkout", "master"], stdout=devnull, stderr=devnull)
-
-def buildTag(recipe, tag):
-    print("Building tag: " + tag)
-    call(recipe, shell=True, cwd="builds/"+tag)
-
-def abiDump(sofiles, tag):
-    print("Creating abi-dump for: " + str(sofiles))
-    command = ["abi-dumper", "-lver", tag]
-    for sofile in sofiles:
-        command.append(os.path.realpath("builds/"+tag+"/"+sofile))
-
-    print(str(command))
-    call(command, cwd="builds/"+tag)
-
-def getMatchingTags(spec):
-    repo = Repo("repo")
-    tags = tag_list(repo)
-    result = []
-
-    for tag in tags:
-        tag = tag.decode('utf-8')
-        for recipe in spec["recipes"]:
-            if (re.match(recipe["tag"], tag)):
-                result.append(tag)
-
-    result=list(set(result))
-    result.sort(key=LooseVersion)
-
-    return result
-
-def getRecipeForTag(spec, tag):
-    for recipe in spec["recipes"]:
-        if (re.match(recipe["tag"], tag)):
-            return recipe["script"]
-    return ""
-
-def getSOfileForTag(spec, tag):
-    for recipe in spec["recipes"]:
-        if (re.match(recipe["tag"], tag)):
-            return recipe["libraries"]
-    return []
-
-
-def createOrUpdateRepo(spec):
-    if (os.path.exists("repo")):
-        print("Pulling updates from: " + spec["url"])
-        call(["git", "-C", "repo", "pull"])
-    else:
-        print("Cloning fresh repo from: " + spec["url"])
-        os.makedirs("repo")
-        call(["git", "clone", spec["url"], "repo"])
-
-def createABIReport(spec, tags):
-    
-    refs = list(tags)
-    refs.extend(spec["branches"])
-
-    for index in range(0,len(refs)-1):
-        tag1 = refs[index]
-        tag2 = refs[index+1]
-        print (refs[index] + " -> " + refs[index+1])
-
-        call(["abi-compliance-checker", "-l", spec["name"], "-old", "builds/"+tag1+"/ABI.dump", "-new", "builds/"+tag2+"/ABI.dump", "-xml"])
-        call(["abi-compliance-checker", "-l", spec["name"], "-old", "builds/"+tag1+"/ABI.dump", "-new", "builds/"+tag2+"/ABI.dump"])
 
 def main():
     if (len(sys.argv) < 2):
         print("Error: please provide a specification file as argument")
         sys.exit(1)
 
-    with open(sys.argv[1], 'r') as stream:
-        spec = yaml.load(stream)
-        createOrUpdateRepo(spec)
-        tags = getMatchingTags(spec)
-
-        for tag in tags:
-            if (not os.path.exists("builds/"+tag)):
-                checkoutTag(tag)
-                buildTag(getRecipeForTag(spec, tag), tag)
-                abiDump(getSOfileForTag(spec, tag), tag)
-
-        for branch in spec["branches"]:
-            checkoutTag(branch)
-            buildTag(spec["recipes"][len(spec["recipes"])-1]["script"], branch)
-            abiDump(spec["recipes"][len(spec["recipes"])-1]["libraries"], branch)
-
-        createABIReport(spec, tags)
+    spec = UpstreamSpecification(sys.argv[1])
+    
+    sourcePath = path.join("sources", spec.getName())
+    buildPath = path.join("builds",spec.getName())
+    
+    repo = GitUpstremSource(spec.getName(), spec.getUrl(), sourcePath, spec.getBranches())
+    repo.update()
+    tags = repo.listVersion(spec.getTags())
+    oldBuild = None
+    for index in range(0,len(tags)-1):
+        tag = tags[index]
+        versionPath = repo.extractVersion(tag, buildPath)
+        build = Builder(spec.getRecipe(tag), tag, spec.getSOfiles(tag), versionPath)
+        if (not build.build()):
+            print("Error building: " + tag, ", see: " + path.join(versionPath, "build.log"), file=sys.stderr)
+        else:
+            if (oldBuild is not None):
+                tag1 = tags[index-1]
+                tag2 = tag
+                print(tag1 + " -> " + tag2)
+                call(["abi-compliance-checker", "-l", spec.getName(), "-old", oldBuild.getABI(), "-new", build.getABI(), "-xml"])
+                call(["abi-compliance-checker", "-l", spec.getName(), "-old", oldBuild.getABI(), "-new", build.getABI()]) 
+            oldBuild = build
+                
 
 if __name__ == "__main__":
     main()
