@@ -13,7 +13,7 @@ class Builder:
         
     def build(self):
         command = ["abi-dumper", "-lver", self.tag]
-        logfile = open("build.log", "w")
+        logfile = open(path.join(self.workingDir,"build.log"), "w")
         if ( not path.exists(path.join(self.workingDir, "ABI.dump"))):
             call(self.recipe, shell=True, cwd=self.workingDir, stdout=logfile, stderr=logfile)
             for sofile in self.sofiles:

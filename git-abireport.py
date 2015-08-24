@@ -30,22 +30,28 @@ def main():
     repo = GitUpstremSource(spec.getName(), spec.getUrl(), sourcePath, spec.getBranches())
     repo.update()
     tags = repo.listVersion(spec.getTags())
-    oldBuild = None
-    for index in range(0,len(tags)-1):
+    
+    print(tags)
+    
+    builds = []
+    logfile = open("compat.log", "w")
+    for index in range(0,len(tags)):
         tag = tags[index]
         versionPath = repo.extractVersion(tag, buildPath)
         build = Builder(spec.getRecipe(tag), tag, spec.getSOfiles(tag), versionPath)
+        builds.append(build)
         if (not build.build()):
             print("Error building: " + tag, ", see: " + path.join(versionPath, "build.log"), file=sys.stderr)
-        else:
-            if (oldBuild is not None):
-                tag1 = tags[index-1]
-                tag2 = tag
-                print(tag1 + " -> " + tag2)
-                call(["abi-compliance-checker", "-l", spec.getName(), "-old", oldBuild.getABI(), "-new", build.getABI(), "-xml"])
-                call(["abi-compliance-checker", "-l", spec.getName(), "-old", oldBuild.getABI(), "-new", build.getABI()]) 
-            oldBuild = build
-                
-
+        elif (index > 0):
+            tag1 = tags[index-1]
+            tag2 = tag
+            reportname = path.join("compat_reports",spec.getName(), tag1 + "_to_" + tag2, "compart_report.xml")
+            if (not path.exists(reportname)):
+                    print("Comparing: " + tag1 + " -> " + tag2)
+                    call(["abi-compliance-checker", "-l", spec.getName(), "-old", builds[index-1].getABI(), "-new", builds[index].getABI(), "-xml"], stdout=logfile, stderr=logfile)
+                    call(["abi-compliance-checker", "-l", spec.getName(), "-old", builds[index-1].getABI(), "-new", builds[index].getABI()], stdout=logfile, stderr=logfile)
+                    if (not path.exists(reportname)):
+                        print("Error comparing: " + tag1 + " -> " + tag2, file=sys.stderr)                
+    logfile.close()
 if __name__ == "__main__":
     main()
