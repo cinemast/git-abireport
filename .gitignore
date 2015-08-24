@@ -26,3 +26,13 @@
 *.exe
 *.out
 *.app
+
+.idea/
+.project
+.pydevproject
+__pycache__
+build.log
+builds/
+compat_reports/
+sources/
+
