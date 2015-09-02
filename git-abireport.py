@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from compatreport import CompatReport
 __author__ = "Peter Spiess-Knafl"
 __copyright__ = "Copyright 2015"
 __license__ = "GPLv3"
@@ -12,6 +13,8 @@ from subprocess import call
 from builder import Builder
 from upstreamspecification import UpstreamSpecification
 from gitupstreamsource import GitUpstremSource
+from jinja2 import Environment, PackageLoader
+from jinja2 import Template
 
 def createSummary(spec, tags):
     return False
@@ -29,29 +32,31 @@ def main():
     
     repo = GitUpstremSource(spec.getName(), spec.getUrl(), sourcePath, spec.getBranches())
     repo.update()
-    tags = repo.listVersion(spec.getTags())
-    
-    print(tags)
-    
+    tags = repo.listVersion(spec.getTags())  
+
     builds = []
-    logfile = open("compat.log", "w")
+    reports = []
     for index in range(0,len(tags)):
         tag = tags[index]
         versionPath = repo.extractVersion(tag, buildPath)
         build = Builder(spec.getRecipe(tag), tag, spec.getSOfiles(tag), versionPath)
         builds.append(build)
+        
         if (not build.build()):
             print("Error building: " + tag, ", see: " + path.join(versionPath, "build.log"), file=sys.stderr)
-        elif (index > 0):
-            tag1 = tags[index-1]
-            tag2 = tag
-            reportname = path.join("compat_reports",spec.getName(), tag1 + "_to_" + tag2, "compart_report.xml")
-            if (not path.exists(reportname)):
-                    print("Comparing: " + tag1 + " -> " + tag2)
-                    call(["abi-compliance-checker", "-l", spec.getName(), "-old", builds[index-1].getABI(), "-new", builds[index].getABI(), "-xml"], stdout=logfile, stderr=logfile)
-                    call(["abi-compliance-checker", "-l", spec.getName(), "-old", builds[index-1].getABI(), "-new", builds[index].getABI()], stdout=logfile, stderr=logfile)
-                    if (not path.exists(reportname)):
-                        print("Error comparing: " + tag1 + " -> " + tag2, file=sys.stderr)                
-    logfile.close()
+        if (index > 0):
+            report = CompatReport(spec.getName(), builds[index-1], builds[index])
+            if (not report.generateReport()):
+                print ("Error comparing: " + builds[index-1].tag + " -> " + builds[index].tag, file=sys.stderr)
+            else:
+                print ("Compared " + builds[index-1].tag + " -> " + builds[index].tag)
+            reports.append(report)
+            
+    reports = reversed(reports)
+    env = Environment(loader=PackageLoader("git-abireport", "template"))
+    template = env.get_template('report.html')
+    with open(path.join("compat_reports",spec.getName() +'_compat_report.html'), 'w') as reportfile:
+        print(template.render(name=spec.getName(), reports=reports), file=reportfile)
+                        
 if __name__ == "__main__":
     main()

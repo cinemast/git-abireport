@@ -46,7 +46,6 @@ class GitUpstremSource():
         return result
 
     def extractVersion(self, version, targetPath):
-        print("Checking out tag: " + version)
         _path = path.join(targetPath, version)
         if (path.exists(_path) and version in self.branches):
             rmtree(_path)      
