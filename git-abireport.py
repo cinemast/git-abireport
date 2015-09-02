@@ -8,6 +8,7 @@ __email__ = "dev@spiessknafl.at"
 __status__ = "Development"
 
 import sys
+import datetime
 from os import path
 from subprocess import call
 from builder import Builder
@@ -56,7 +57,8 @@ def main():
     env = Environment(loader=PackageLoader("git-abireport", "template"))
     template = env.get_template('report.html')
     with open(path.join("compat_reports",spec.getName() +'_compat_report.html'), 'w') as reportfile:
-        print(template.render(name=spec.getName(), reports=reports), file=reportfile)
+        now = datetime.datetime.now()
+        print(template.render(name=spec.getName(), url=spec.getUrl(), reports=reports, update=now.strftime("%Y-%m-%d %H:%M:%S")), file=reportfile)
                         
 if __name__ == "__main__":
     main()

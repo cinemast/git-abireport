@@ -9,7 +9,7 @@ recipes:
       libraries: 
         - build/usr/local/lib/libjsoncpp.so
       script: |
-        mkdir build
+        mkdir -p build
         cd build
         cmake -DJSONCPP_LIB_BUILD_SHARED=ON -DCMAKE_BUILD_TYPE=Debug ..
         make
@@ -18,7 +18,7 @@ recipes:
       libraries: 
         - build/usr/local/lib/libjsoncpp.so
       script: |
-        mkdir build
+        mkdir -p build
         cd build
         cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Debug ..
         make

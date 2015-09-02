@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <title>{{name}} - compatibility report</title>
+
+    <!-- Bootstrap -->
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+  </head>
+  <body>
+    <div class="container">
+
+      <div class="page-header">
+        <h1>{{name}} - compatibility report</h1>
+      </div>
+      
+      <div class="row">
+      	<div class="col-md-6">
+      		<p><label>Url:</label> {{ url }} </p>
+      		<p><label>last update:</label> {{ update }} </p>      	
+      	</div>
+      	<div class="col-md-6">
+      	
+      	</div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-12">
+        	<table class="table table-hover">
+        		<tr>        			
+        			<th>Versions</th>
+        			<th>Build</th>
+					<th>Binary</th>
+					<th>Source</th>
+					<th>Details</th>
+					<th>V1  build-log</th>
+        			<th>V2  build-log</th>
+        		</tr>
+        		{% for report in reports %}
+        		<tr>
+        			<td>{{report.build1.tag}} -> {{report.build2.tag}} </td>
+        			{% if report.valid %}
+        				<td><span class="label label-success">Success</span></td>
+						{% if report.report.binary.verdict == "compatible" %}
+						<td><span class="label label-success">{{report.report.binary.verdict}}</span></td>
+						{% else %}
+						<td><span class="label label-danger">{{report.report.binary.verdict}}</span> {{report.report.binary.affected}} %</td>
+						{% endif %}
+						
+						{% if report.report.source.verdict == "compatible" %}
+						<td><span class="label label-success">{{report.report.source.verdict}}</span></td>
+						{% else %}
+						<td><span class="label label-danger">{{report.report.source.verdict}}</span> {{report.report.source.affected}} %</td>
+						{% endif %}
+						<td><a href="{{name + '/' + report.build1.tag + '_to_' + report.build2.tag + '/compat_report.html' }}">Detailed report</a></td>
+					{% else %}
+						<td><span class="label label-warning">FTBFS</span></td>
+						<td></td>
+						<td></td>
+						<td></td>
+					{% endif %}
+					<td><a href="{{name + '/' + report.build1.tag + '_to_' + report.build2.tag + '/build1.log' }}">build1.log</a></td>
+        			<td><a href="{{name + '/' + report.build1.tag + '_to_' + report.build2.tag + '/build2.log' }}">build2.log</a></td>
+        		</tr>
+        		{% endfor %}
+        	</table>
+        
+        </div>
+       
+      </div>
+    </div> 
+</html>
